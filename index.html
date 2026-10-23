@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>数独 Sudoku</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --text: #1f2430;
+    --sub: #6b7280;
+    --line: #d3d8e2;
+    --bold: #5a6478;
+    --given: #1f2430;
+    --filled: #2563eb;
+    --error: #dc2626;
+    --sel: #2563eb;
+    --peer: #e8eefc;
+    --same: #bfd7ff;
+    --btn: #ffffff;
+    --btn-hover: #eef2fb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12141c;
+      --card: #1c2030;
+      --text: #e5e9f2;
+      --sub: #8b93a7;
+      --line: #333a4d;
+      --bold: #566179;
+      --given: #e5e9f2;
+      --filled: #5b9bff;
+      --error: #f87171;
+      --sel: #5b9bff;
+      --peer: #262d42;
+      --same: #33507e;
+      --btn: #232941;
+      --btn-hover: #2c3452;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 16px 12px 32px;
+  }
+  .wrap { width: 100%; max-width: 480px; }
+  header { text-align: center; margin-bottom: 12px; }
+  header h1 { font-size: 22px; letter-spacing: 2px; }
+  header p { font-size: 12px; color: var(--sub); margin-top: 2px; }
+  .statusbar {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--card); border-radius: 12px; padding: 10px 14px;
+    margin-bottom: 12px; font-size: 13px; color: var(--sub);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .statusbar b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .controls { display: flex; gap: 8px; margin-bottom: 12px; }
+  .controls select, .controls button {
+    flex: 1; border: 1px solid var(--line); background: var(--btn); color: var(--text);
+    border-radius: 10px; padding: 9px 4px; font-size: 13px; cursor: pointer;
+  }
+  .controls select:hover, .controls button:hover { background: var(--btn-hover); }
+  .controls button.active { border-color: var(--sel); color: var(--sel); font-weight: 600; }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: var(--card);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    user-select: none;
+  }
+  .cell {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    font-size: clamp(16px, 5.2vw, 26px);
+  }
+  .cell.b-right { border-right: none; }
+  .cell.b-bottom { border-bottom: none; }
+  .cell.b-top { border-top: 2.5px solid var(--bold); }
+  .cell.b-left { border-left: 2.5px solid var(--bold); }
+  .cell .val { font-weight: 500; line-height: 1; }
+  .cell.given .val { color: var(--given); font-weight: 600; }
+  .cell.filled .val { color: var(--filled); }
+  .cell.error .val { color: var(--error); }
+  .cell.peer { background: var(--peer); }
+  .cell.same .val { color: var(--sel); font-weight: 700; }
+  .cell.sel { background: var(--sel); }
+  .cell.sel .val { color: #fff; }
+  .cell.sel .notes span { color: #fff; }
+  .notes {
+    position: absolute; inset: 0;
+    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+    padding: 1px;
+  }
+  .notes span { font-size: clamp(7px, 2vw, 11px); color: var(--sub); line-height: 1; display: flex; align-items: center; justify-content: center; }
+  #pad {
+    display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px;
+    margin-top: 14px;
+  }
+  #pad button {
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+    border-radius: 10px; padding: 10px 0 8px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  #pad button:hover { background: var(--btn-hover); }
+  #pad button:disabled { opacity: 0.3; cursor: default; }
+  #pad .num { font-size: 20px; font-weight: 600; }
+  #pad .rest { font-size: 10px; color: var(--sub); }
+  footer { text-align: center; margin-top: 18px; font-size: 12px; color: var(--sub); }
+  #overlay {
+    position: fixed; inset: 0; background: rgba(10, 14, 24, 0.55);
+    display: none; align-items: center; justify-content: center; z-index: 10;
+  }
+  #overlay.show { display: flex; }
+  #overlay .card {
+    background: var(--card); border-radius: 16px; padding: 32px 40px;
+    text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  }
+  #overlay h2 { font-size: 26px; margin-bottom: 10px; }
+  #overlay p { font-size: 14px; color: var(--sub); margin-bottom: 6px; }
+  @media (max-width: 420px) {
+    #pad { gap: 4px; }
+    #pad .num { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>数 独</h1>
+    <p>Sudoku · 每日来一局</p>
+  </header>
+
+  <div class="statusbar">
+    <span>难度 <b id="diff-label">中等</b></span>
+    <span>用时 <b id="timer">00:00</b></span>
+    <span>错误 <b id="mistakes">0</b></span>
+  </div>
+
+  <div class="controls">
+    <select id="diff-select" aria-label="难度">
+      <option value="easy">简单</option>
+      <option value="medium" selected>中等</option>
+      <option value="hard">困难</option>
+      <option value="expert">专家</option>
+    </select>
+    <button id="btn-note" title="快捷键 N">笔记</button>
+    <button id="btn-undo" title="快捷键 Z">撤销</button>
+    <button id="btn-hint">提示</button>
+    <button id="btn-erase">擦除</button>
+    <button id="btn-new">新局</button>
+  </div>
+
+  <div id="board" aria-label="数独棋盘"></div>
+
+  <div id="pad" aria-label="数字键盘">
+    <button data-n="1"><span class="num">1</span><span class="rest">9</span></button>
+    <button data-n="2"><span class="num">2</span><span class="rest">9</span></button>
+    <button data-n="3"><span class="num">3</span><span class="rest">9</span></button>
+    <button data-n="4"><span class="num">4</span><span class="rest">9</span></button>
+    <button data-n="5"><span class="num">5</span><span class="rest">9</span></button>
+    <button data-n="6"><span class="num">6</span><span class="rest">9</span></button>
+    <button data-n="7"><span class="num">7</span><span class="rest">9</span></button>
+    <button data-n="8"><span class="num">8</span><span class="rest">9</span></button>
+    <button data-n="9"><span class="num">9</span><span class="rest">9</span></button>
+  </div>
+
+  <footer>键盘可玩：数字键填入 · 方向键移动 · N 笔记 · Z 撤销 · 退格擦除</footer>
+</div>
+
+<div id="overlay">
+  <div class="card">
+    <h2>🎉 恭喜完成！</h2>
+    <p id="result"></p>
+    <p style="margin-top:10px">点击任意处继续</p>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
